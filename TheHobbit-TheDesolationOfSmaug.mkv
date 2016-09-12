@@ -1,0 +1,115 @@
+#!/bin/bash
+
+# lol jk this aint a movie.
+# Welcome to Peter Jackson's transcoding utility, which converts downloaded youtube videos to mp3.
+# Requires ffmpeg only, because this movie is LAME enough to convert stuff to mp3 all by itself.
+
+#lol jk it also requires LAME, but joke still stands. 
+#You're still using a lame movie to convert stuff to mp3.
+
+convertDIR="/home/tamius-han/Namizje/0.convert/"
+tmpDIR="~/Namizje/0.tempMusic"
+finalDestination="/media/Dragon/Music"
+
+IsOfTesting=false
+
+if [ $(echo "$@" | grep "test" -c) -gt 0 ] ; then
+  IsOfTesting=true
+fi
+
+
+function getSeconds {
+  while IFS='.' read sign hour min sec ; do
+    echo $(( $(($hour*3600)) + $(($min * 60)) + 60 )) 
+  done <<< "$1"  
+}
+
+function convertwaw {
+   
+  IFS="-" read -a args <<< "${1%.*}"
+  ARTIST="$(echo "${args[0]:2}" | sed -e 's/^ *//' -e 's/ *$//')"
+  TITLE="$(echo "${args[1]}" | sed -e 's/^ *//' -e 's/ *$//')"
+  if [[ $# -gt 2 ]]; then
+    if [ echo "${args[2]}" | grep -q "start." ] ; then
+      ALBUM=""
+    else
+      ALBUM="$(echo "${args[2]}" | sed -e 's/^ *//' -e 's/ *$//')"
+    fi
+    
+    if [ echo "${args[@]}" | grep -q "start." ] ; then
+      SS="$(getSeconds "$(echo "${args[@]}" | tr ' ' '\n' | grep "start.")")"
+    fi
+    if [ echo "${args[@]}" | grep -q "end." ] ; then
+      T=$(getSeconds "$(echo "${args[@]}" | tr ' ' '\n' | grep "end.")" )
+      if [ echo "${args[@]}" | grep -q "start." ] ; then
+	T="$(($T - $SS))"
+      fi
+    fi
+  fi
+  
+  if [ ! -z "$T" ] ; then
+    T="-t $T"
+  else
+    T=""
+  fi
+  
+  if [ ! -z "$SS" ] ; then
+    SS="-ss $SS"
+  else
+    SS=""
+  fi
+  
+  ffmpeg -i "$1" -q:a 0 $SS $T "$2.wav"
+  
+  if [[ $? -ne 0 ]] ; then
+    return #ker se lahko zgodijo napake
+  fi 
+  
+  
+  convertmp3 $2 "$ARTIST" "$TITLE" "$ALBUM" "$1" &
+}
+
+
+function convertmp3 {
+  fname="$2 - $3.mp3"
+  
+  #Utegne se zgoditi, da metapodatkov ni. Ups.
+  
+  emptyString=""
+  if [ -z "$2" ] || [ -z $3 ] ; then
+    fname="${5%.*}.mp3"
+  fi
+  
+  printlnYellow "------------------"
+  printlnYellow "Pretvarjanje v mp3"
+  echo          "Ime datoteke: $fname"
+  echo          "Naslov:    $3"
+  echo          "Izvajalec: $2"
+  echo          "Album:     $4"
+  printlnYellow "------------------"
+  
+  lame -V0  "$1.wav" "$fname" --ta "$2" --tt "$3" --tl "$4"
+  
+  rm "$1.wav"
+  if [ ! $IsOfTesting ] ; then
+    rm "$5"
+  fi
+}
+
+num=0
+cd "$convertDIR"
+pwd
+for f in ./* ; do
+  if [ $(echo "$f" | egrep .flv$\|.mkv$\|.mp4$\|.webm$\|.m4a$\|.flac$ -c) -gt 0 ] ; then
+    convertwaw "$f" $num
+    num=$((num + 1))
+  fi
+done
+
+if [ $(echo "$@" | grep "test" -c) -gt 0 ] ; then
+  exit 0
+fi
+
+cp "$convertDIR/*" "$tmpDIR"
+mv "$convertDIR/*" "$finalDestination"
+

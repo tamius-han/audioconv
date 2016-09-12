@@ -1,0 +1,143 @@
+#!/bin/bash
+# Extracts sound from youtube vid. (which it takes as an argument.) Sound is
+# extracted to a file with same name (different extension) in same directory.
+# It also copies a copy of resulting file to /music/ytdownloads
+#
+# Extracted sound is saved as .mp3. Even though Youtube's format (.aac) 
+# has a lower bitrate (192 kb/s best case), the mp3 files are encoded at
+# higher bitrate (due to the technical differences between the codecs and because
+# we don't want to avoid further decrease of quality as much as possible).
+#
+#
+# If ytdownloads folder is not present, it's created.
+# if /music isn't a link to your music folder, then the program flips shit.
+# You can change your 'ytdownloads' and '/music' below:
+########################################################################
+
+# Land where <strike>dragons</strike>music rules
+# (We want to know where you keep your music)
+
+musiclib="/music"
+
+
+# Where to put an extra copy of the song
+
+end_dest="ytdownloads"
+
+
+#
+#
+#
+#  Don't touch the shit below if you have no idea what you're doing.
+#
+#
+
+
+
+
+#
+#
+#
+#  Helper functions:
+#
+#
+#
+
+function convertwaw {
+  
+  IFS="-" read -a args <<< "${1%.*}"
+  ARTIST="$(echo "${args[0]:2}" | sed -e 's/^ *//' -e 's/ *$//')"
+  TITLE="$(echo "${args[1]}" | sed -e 's/^ *//' -e 's/ *$//')"
+  
+  if [[ $# -gt 2 ]]; then
+    if [ echo "${args[2]}" | grep -q "start." ] ; then
+      ALBUM=""
+    else
+      ALBUM="$(echo "${args[2]}" | sed -e 's/^ *//' -e 's/ *$//')"
+    fi
+    
+    if [ echo "${args[@]}" | grep -q "start." ] ; then
+      SS="$(getSeconds "$(echo "${args[@]}" | tr ' ' '\n' | grep "start.")")"
+    fi
+    
+    if [ echo "${args[@]}" | grep -q "end." ] ; then
+      T=$(getSeconds "$(echo "${args[@]}" | tr ' ' '\n' | grep "end.")" )
+      if [ echo "${args[@]}" | grep -q "start." ] ; then
+        T="$(($T - $SS))"
+      fi
+    fi
+  fi
+  
+  if [ ! -z "$T" ] ; then
+    T="-t $T"
+  else
+    T=""
+  fi
+  
+  if [ ! -z "$SS" ] ; then
+    SS="-ss $SS"
+  else
+    SS=""
+  fi
+  
+  ffmpeg -i "$1" -q:a 0 $SS $T "${1%.*}.wav"
+  
+  if [[ $? -ne 0 ]] ; then
+    return #ker se lahko zgodijo napake
+  fi 
+
+  convertmp3 "${1%.*}.wav" "$ARTIST" "$TITLE" "$ALBUM" "$1" 
+}
+
+function convertmp3 {
+  fname="${1%.*}.mp3"
+  
+  #Utegne se zgoditi, da metapodatkov ni. Ups.
+  
+  emptyString=""
+  if [ -z "$2" ] || [ -z $3 ] ; then
+    fname="${5%.*}.mp3"
+  fi
+  
+#   printlnYellow "------------------"
+#   printlnYellow "Pretvarjanje v mp3"
+#   echo          "Ime datoteke: $fname"
+#   echo          "Naslov:    $3"
+#   echo          "Izvajalec: $2"
+#   echo          "Album:     $4"
+#   printlnYellow "------------------"
+  
+  lame -h -V0  "$1" "$fname" --ta "$2" --tt "$3" --tl "$4"
+  
+  dfname="${fname##*/}"
+  cp "$fname" $musiclib/$end_dest/"$dfname"
+  rm "$1"
+  
+  if [ ! $IsOfTesting ] ; then
+    rm "$5"
+  fi
+}
+
+source colors.sh
+
+if ! ls "$musiclib" > /dev/null ; then
+  printf "Default music library is set to: $BCyan$musiclib$Color_Off\n"
+  printf "There's nothing at that directory tho. You need to change ${BCyan}musiclib$Color_Off variable in the script (the first non-empty line that doesn't start with 
+#)\n"
+  printf "Script will now flip shit and exit.\n"
+  exit 1
+fi
+
+if ! ls "$musiclib/$end_dest" > /dev/null ; then
+  echo "folder $end_dest not found in music library. Creating."
+  mkdir -p $musiclib/$end_dest
+fi
+
+#ffmpeg -i "$1" -vn -acodec copy "${1%.*}.aac"
+
+convertwaw "$1"
+
+# fname="${1%.*}.mp3"
+# fname="${fname##*/}"
+
+printf "${BGreen}Audio extraction finished.$Color_Off\n"

@@ -1,0 +1,128 @@
+#! /bin/bash
+
+# Turns out the thing we all like to hate and bash can sometimes get its use in the most unlikely places.
+
+if [ -z "$1" ] && [ "$1" == "--help" ] || [ "$1" == "-h" ] ; then
+  echo "Welcome to Peter Jackson's transcoding utility."
+  echo "Note: if you happen to own (one way 'arr the other) Peter Jackson's hobbit movies, you don't need to have LAME installed on your computer. All you need is to have The Hobbit (either of the three by Peter Jackson will do) in your computer's blu-ray or DVD drive, or stored in a folder on your computer (note: you must be able to access said folder). Movies contain more than enough lame moments to power this script for a month at least. Turns out the things we all like to hate on and bash (pun intended) can sometimes find their use in the most unlikely of places."
+  echo "Note 1: I haven't tested the script using Jackson's The Hobbit instead of LAME because they're worth neither my money nor my bandwidth."
+  echo "NOTE 2: FFmpeg is still required (newest stable will do), and LAME (likewise, newest stable will do) is of course preferred to Peter Jackson's The Hobbit movies. Unlike LAME, the movies aren't very 'stable' as they are fundamentally broken (few examples of known bugs: Azog, stone giants, things under the goblin mountain, legolass, Smaug with his insecurities (which probably stem from the fact he isn't a dragon but a wyvern instead) and of course, neither last nor least and (ironically) probably the biggest source of lameness in the movies so far: the barrel scene). As as result, they may segfault a lot. This may result in data loss (even without the -d option)."
+  echo "[Note 3: I am very much aware that only two movies were released at the time I was writting this script, but based on the first two movies the third won't be different.]"
+  echo "NOTE 4: This utility is recursive. It starts in current directory and checks all the subfolders. If audio files contained within [alan, please add supported filetypes] are not .mp3 files, they will get converted to mp3."
+  echo ""
+  echo ""
+  echo "Usage:"
+  echo "--help: displays this help"
+  echo "--test: doesn't do anything"
+  echo "--delete: forces delete of source"
+  echo "-d      : also forces delete of source"
+  echo "<using TheHobbit movies instead of legit LAME>: Also forces delete of source"
+  echo ""
+  exit 0
+fi
+
+echo   "Dependency check:"
+printf "    ${Green}[ OK ]$Color_Off   ffmpeg\n"
+printf "    ${Green}[ OK ]$Color_Off   LAME -or- either of the Peter Jackson's The Hobbit movies (obtained one way 'arr the other)\n"
+echo   ""
+echo   ""
+echo   "(Note: as of 2016, a copy of the 2016's Ghostbusters movie can also be used in place of LAME. Using second or third Hobbit"
+echo   "usually gives the best results, by far."
+echo   ""
+echo   ""
+echo   "Turns that even the things we like to bash and hate on can sometimes find their use in the most unlikely of places."
+
+
+source colors.sh
+DELETE=false
+
+for i in seq 1 $# ; do
+  if [ $$i == '-d' ] || [ $$i == '--delete' ] ; then
+    DELETE=true
+  fi
+done
+
+function convertOne {
+  convertwaw "$1" $num
+}
+
+function convertwaw {
+  ffmpeg -loglevel quiet -i "$1" -q:a 0 "$2.wav"
+  
+  if [[ $? -ne 0 ]] ; then
+    return #ker se lahko zgodijo napake
+  fi
+  
+  ffprobe -report "$1"
+  ARTIST=$(cat ffprobe-*.log | grep -i "ARTIST" | awk -F ': ' '{print $2}')
+  ALBUM=$(cat ffprobe-*.log | grep -i "ALBUM" | awk -F ': ' '{print $2}')
+  TITLE=$(cat ffprobe-*.log | grep -i "TITLE" | awk -F ': ' '{print $2}')
+  GENRE=$(cat ffprobe-*.log | grep -i "GENRE" | awk -F ': ' '{print $2}')
+  track=$(cat ffprobe-*.log | grep -i "track" | awk -F ': ' '{print $2}')
+  DATE=$(cat ffprobe-*.log | grep -i "DATE" | awk -F ': ' '{print $2}')
+  rm ffprobe-*.log
+  
+  convertmp3 $2 "$ARTIST" "$TITLE" "$ALBUM" "$DATE" "$track" "$GENRE" "$1" &
+}
+
+function convertmp3 {
+  fname="$2 - $3.mp3"
+  
+  #Utegne se zgoditi, da metapodatkov ni. Ups.
+  
+  emptyString=""
+  if [ -z "$2" ] || [ -z $3 ] ; then
+    fname="${8%.*}.mp3"
+  fi
+  
+  printlnYellow "------------------"
+  printlnYellow "Pretvarjanje v mp3"
+  echo          "Ime datoteke: $fname"
+  echo          "Naslov:    $3"
+  echo          "Izvajalec: $2"
+  echo          "Album:     $4"
+  echo          "Leto:      $5; Zvrst: $7; Številka skladbe: $6"
+  printlnYellow "------------------"
+  
+  lame -S -V0 -h  "$1.wav" "$fname" --ta "$2" --tt "$3" --tl "$4" --ty "$5" --tn "$6" --tg "$7"
+  
+  rm "$1.wav"
+  #if [ $DELETE ] ; then
+    rm "$8"
+  #fi
+}
+
+function printlnYellow {
+  tput setaf 3
+  tput bold
+  echo "$@"
+  tput sgr0
+}
+
+function search {
+  num=0
+  for f in * ; do
+    if [ -d "$f" ] ; then
+      cd "$f"
+      search
+      cd ..
+    elif [ $(echo "$f" | egrep .aac$\|.m4a$\|.flac$ -c) -gt 0 ] ; then
+      echo "Converting $f..."
+      printlnYellow "------------------------------------"
+      echo ""
+      echo ""
+      echo ""
+      printlnYellow " CURRENT NUMBER: $num "
+      echo ""
+      echo ""
+      echo ""
+      printlnYellow "------------------------------------"
+      convertOne "$f" $num
+      num=$(($num + 1))
+    fi
+  done
+}
+
+search
+
+echo "Fertik je!"
