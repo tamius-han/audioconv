@@ -13,7 +13,7 @@ Scripts don't care much for where you save them. They have to be in your $PATH, 
 
 # Scripts
 
-##TheHobbit.mkv
+## TheHobbit.mkv
 
 The script starts in the current directory and recursively searches for the following files:
 
@@ -25,7 +25,7 @@ and converts them to mp3. It tries to preserve metadata. Converted files end in 
 
 If you launch the script with `-d` flag, the source files will be deleted.
 
-##TheHobbit-TheDesolationOfSmaug.mkv
+## TheHobbit-TheDesolationOfSmaug.mkv
 
 This script is a bit more directed iteration of `TheHobbit.mkv`, written back in 2013 or 2014 (I guess). It converts files inside a specific directory. After converting, it saves two copies: one in a temporary directory and one in the music library. By default, the directories are:
 
